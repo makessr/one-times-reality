@@ -41,17 +41,17 @@ EOF
 }
 
 # ──────────────────────────────────────────────
-# 生成自签名证书（用于 tuic）
+# 生成自签名证书（用于 QUIC 协议：tuic / hysteria2）
 # ──────────────────────────────────────────────
 function gen_self_signed_cert() {
     local CERT_DIR="$1"
     mkdir -p "$CERT_DIR"
-    if [ ! -f "$CERT_DIR/tuic.crt" ] || [ ! -f "$CERT_DIR/tuic.key" ]; then
+    if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then
         info "生成自签名证书..."
         openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
-            -days 3650 -keyout "$CERT_DIR/tuic.key" -out "$CERT_DIR/tuic.crt" \
+            -days 3650 -keyout "$CERT_DIR/server.key" -out "$CERT_DIR/server.crt" \
             -subj "/CN=salanghe.com" -addext "subjectAltName=DNS:salanghe.com"
-        info "证书已生成: $CERT_DIR/tuic.crt"
+        info "证书已生成: $CERT_DIR/server.crt"
     else
         info "证书已存在，跳过生成"
     fi
@@ -272,8 +272,8 @@ function install_tuic() {
         "enabled": true,
         "server_name": "${SNI}",
         "alpn": ["h3"],
-        "certificate_path": "${CONFIG_DIR}/tuic.crt",
-        "key_path": "${CONFIG_DIR}/tuic.key"
+        "certificate_path": "${CONFIG_DIR}/server.crt",
+        "key_path": "${CONFIG_DIR}/server.key"
       }
     }
   ],
@@ -322,7 +322,94 @@ EOF
 }
 
 # ──────────────────────────────────────────────
-# VLESS + Reality + TUIC v5 全安装
+# Hysteria2 安装
+# ──────────────────────────────────────────────
+function install_hy2() {
+    download_singbox
+
+    HY2_PASS=$(openssl rand -base64 16 | tr -d '=+/')
+    OBFS_PASS=$(openssl rand -base64 12 | tr -d '=+/')
+    PORT=$((RANDOM % 10000 + 30000))  # 30000-40000
+    SNI="salanghe.com"
+
+    mkdir -p "$CONFIG_DIR"
+    gen_self_signed_cert "$CONFIG_DIR"
+
+    cat > "$CONFIG_FILE" <<EOF
+{
+  "log": {
+    "level": "info"
+  },
+  "inbounds": [
+    {
+      "type": "hysteria2",
+      "tag": "hy2-in",
+      "listen": "::",
+      "listen_port": ${PORT},
+      "users": [
+        {
+          "password": "${HY2_PASS}"
+        }
+      ],
+      "obfs": {
+        "type": "strange",
+        "password": "${OBFS_PASS}"
+      },
+      "tls": {
+        "enabled": true,
+        "server_name": "${SNI}",
+        "alpn": ["h3"],
+        "certificate_path": "${CONFIG_DIR}/server.crt",
+        "key_path": "${CONFIG_DIR}/server.key"
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "final": "direct"
+  }
+}
+EOF
+
+    info "验证配置文件..."
+    if ! $BIN_FILE check -c "$CONFIG_FILE"; then
+        err "配置文件验证失败！"
+        exit 1
+    fi
+
+    setup_systemd
+
+    SERVER_IP=$(curl -s ipv4.icanhazip.com)
+    HY2_URL="hysteria2://${HY2_PASS}@${SERVER_IP}:${PORT}?insecure=1&obfs=salamander&obfs-password=${OBFS_PASS}&sni=${SNI}&alpn=h3#Hysteria2"
+
+    echo ""
+    info "======================"
+    info "Sing-Box Hysteria2 安装完成 ✅"
+    info "服务状态: $(systemctl is-active $SERVICE_NAME)"
+    info "监听端口: $PORT (UDP)"
+    echo ""
+    info "客户端链接："
+    echo "${HY2_URL}"
+    echo ""
+    info "⚠  Hysteria2 使用自签名证书，客户端需关闭证书验证(?)insecure=1)"
+    echo ""
+    info "管理命令："
+    info "启动: systemctl start $SERVICE_NAME"
+    info "停止: systemctl stop $SERVICE_NAME"
+    info "状态: systemctl status $SERVICE_NAME"
+    info "日志: journalctl -u $SERVICE_NAME -f"
+    info "======================"
+
+    clean_temp
+}
+
+# ──────────────────────────────────────────────
+# 三协议全安装：VLESS + Reality + TUIC v5 + Hysteria2
 # ──────────────────────────────────────────────
 function install_all() {
     download_singbox
@@ -341,6 +428,12 @@ function install_all() {
     TUIC_PASS=$(openssl rand -base64 16 | tr -d '=+/')
     PORT_TUIC=$((RANDOM % 10000 + 20000))
     SNI_TUIC="salanghe.com"
+
+    # Hysteria2 参数
+    HY2_PASS=$(openssl rand -base64 16 | tr -d '=+/')
+    OBFS_PASS=$(openssl rand -base64 12 | tr -d '=+/')
+    PORT_HY2=$((RANDOM % 10000 + 30000))
+    SNI_HY2="salanghe.com"
 
     mkdir -p "$CONFIG_DIR"
     gen_self_signed_cert "$CONFIG_DIR"
@@ -394,8 +487,30 @@ function install_all() {
         "enabled": true,
         "server_name": "${SNI_TUIC}",
         "alpn": ["h3"],
-        "certificate_path": "${CONFIG_DIR}/tuic.crt",
-        "key_path": "${CONFIG_DIR}/tuic.key"
+        "certificate_path": "${CONFIG_DIR}/server.crt",
+        "key_path": "${CONFIG_DIR}/server.key"
+      }
+    },
+    {
+      "type": "hysteria2",
+      "tag": "hy2-in",
+      "listen": "::",
+      "listen_port": ${PORT_HY2},
+      "users": [
+        {
+          "password": "${HY2_PASS}"
+        }
+      ],
+      "obfs": {
+        "type": "strange",
+        "password": "${OBFS_PASS}"
+      },
+      "tls": {
+        "enabled": true,
+        "server_name": "${SNI_HY2}",
+        "alpn": ["h3"],
+        "certificate_path": "${CONFIG_DIR}/server.crt",
+        "key_path": "${CONFIG_DIR}/server.key"
       }
     }
   ],
@@ -422,34 +537,39 @@ EOF
     SERVER_IP=$(curl -s ipv4.icanhazip.com)
     VLESS_URL="vless://${UUID_VLESS}@${SERVER_IP}:${PORT_VLESS}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI_REALITY}&fp=ios&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp#Reality"
     TUIC_URL="tuic://${UUID_TUIC}:${TUIC_PASS}@${SERVER_IP}:${PORT_TUIC}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=${SNI_TUIC}#TUIC"
+    HY2_URL="hysteria2://${HY2_PASS}@${SERVER_IP}:${PORT_HY2}?insecure=1&obfs=salamander&obfs-password=${OBFS_PASS}&sni=${SNI_HY2}&alpn=h3#Hysteria2"
 
     echo ""
-    info "======================"
-    info "Sing-Box 全协议安装完成 ✅"
+    info "===================================="
+    info "Sing-Box 三协议安装完成 ✅"
     info "服务状态: $(systemctl is-active $SERVICE_NAME)"
     echo ""
-    info "── VLESS + Reality ──"
+    info "── 1. VLESS + Reality ──────────────"
     info "监听端口: $PORT_VLESS (TCP)"
     echo "${VLESS_URL}"
     echo ""
-    info "── TUIC v5 ──"
+    info "── 2. TUIC v5 ──────────────────────"
     info "监听端口: $PORT_TUIC (UDP)"
     echo "${TUIC_URL}"
     echo ""
-    info "⚠  tuic v5 使用自签名证书，客户端需关闭证书验证或导入证书"
+    info "── 3. Hysteria2 ────────────────────"
+    info "监听端口: $PORT_HY2 (UDP)"
+    echo "${HY2_URL}"
+    echo ""
+    info "⚠  tuic / hysteria2 均使用自签名证书，客户端需关证书验证"
     echo ""
     info "管理命令："
     info "启动: systemctl start $SERVICE_NAME"
     info "停止: systemctl stop $SERVICE_NAME"
     info "状态: systemctl status $SERVICE_NAME"
     info "日志: journalctl -u $SERVICE_NAME -f"
-    info "======================"
+    info "===================================="
 
     clean_temp
 }
 
 # ──────────────────────────────────────────────
-# 添加 tuic 到已有安装（不改现有配置）
+# 添加 tuic 到已有安装
 # ──────────────────────────────────────────────
 function add_tuic() {
     if [ ! -f "$CONFIG_FILE" ]; then
@@ -464,19 +584,19 @@ function add_tuic() {
 
     gen_self_signed_cert "$CONFIG_DIR"
 
-    # 读取现有配置，插入 tuic inbound
-    # 方法：找到最后一个 inbound 的闭合 }}, 在其后添加 tuic
-    # 更稳健：用 jq 操作
     if ! command -v jq &>/dev/null; then
         apt-get install -y jq
     fi
 
-    # 检查是否已有 tuic inbound
     if jq -e '.inbounds[] | select(.type == "tuic")' "$CONFIG_FILE" >/dev/null 2>&1; then
         warn "已有 tuic inbound，跳过添加"
-    else
-        # 构建新 inbound
-        TUIC_INBOUND=$(cat <<EOJ
+        return
+    fi
+
+    # 备份
+    cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
+
+    TUIC_INBOUND=$(cat <<EOJ
 {
   "type": "tuic",
   "tag": "tuic-in",
@@ -495,40 +615,124 @@ function add_tuic() {
     "enabled": true,
     "server_name": "${SNI_TUIC}",
     "alpn": ["h3"],
-    "certificate_path": "${CONFIG_DIR}/tuic.crt",
-    "key_path": "${CONFIG_DIR}/tuic.key"
+    "certificate_path": "${CONFIG_DIR}/server.crt",
+    "key_path": "${CONFIG_DIR}/server.key"
   }
 }
 EOJ
 )
 
-        jq --argjson tuic "$TUIC_INBOUND" '.inbounds += [$tuic]' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+    jq --argjson tuic "$TUIC_INBOUND" '.inbounds += [$tuic]' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 
-        info "验证配置文件..."
-        if ! $BIN_FILE check -c "$CONFIG_FILE"; then
-            err "配置文件验证失败！回滚..."
-            mv "${CONFIG_FILE}.bak" "$CONFIG_FILE" 2>/dev/null || true
-            exit 1
-        fi
-
-        systemctl restart "$SERVICE_NAME"
-        sleep 2
-
-        if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-            err "服务重启失败！"
-            journalctl -u "$SERVICE_NAME" --no-pager -n 20
-            exit 1
-        fi
-
-        SERVER_IP=$(curl -s ipv4.icanhazip.com)
-        TUIC_URL="tuic://${UUID_TUIC}:${TUIC_PASS}@${SERVER_IP}:${PORT_TUIC}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=${SNI_TUIC}#TUIC"
-
-        echo ""
-        info "TUIC v5 已添加到现有配置 ✅"
-        info "监听端口: $PORT_TUIC (UDP)"
-        echo "${TUIC_URL}"
-        info "⚠  tuic v5 使用自签名证书，客户端需关闭证书验证或导入证书"
+    info "验证配置文件..."
+    if ! $BIN_FILE check -c "$CONFIG_FILE"; then
+        err "配置文件验证失败！回滚..."
+        mv "${CONFIG_FILE}.bak" "$CONFIG_FILE" 2>/dev/null || true
+        exit 1
     fi
+
+    systemctl restart "$SERVICE_NAME"
+    sleep 2
+
+    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+        err "服务重启失败！"
+        journalctl -u "$SERVICE_NAME" --no-pager -n 20
+        exit 1
+    fi
+
+    SERVER_IP=$(curl -s ipv4.icanhazip.com)
+    TUIC_URL="tuic://${UUID_TUIC}:${TUIC_PASS}@${SERVER_IP}:${PORT_TUIC}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=${SNI_TUIC}#TUIC"
+
+    echo ""
+    info "TUIC v5 已添加到现有配置 ✅"
+    info "监听端口: $PORT_TUIC (UDP)"
+    echo "${TUIC_URL}"
+    info "⚠  tuic v5 使用自签名证书，客户端需关闭证书验证或导入证书"
+
+    rm -f "${CONFIG_FILE}.bak"
+}
+
+# ──────────────────────────────────────────────
+# 添加 hysteria2 到已有安装
+# ──────────────────────────────────────────────
+function add_hy2() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        err "配置文件不存在，请先运行 install"
+        exit 1
+    fi
+
+    HY2_PASS=$(openssl rand -base64 16 | tr -d '=+/')
+    OBFS_PASS=$(openssl rand -base64 12 | tr -d '=+/')
+    PORT_HY2=$((RANDOM % 10000 + 30000))
+    SNI_HY2="salanghe.com"
+
+    gen_self_signed_cert "$CONFIG_DIR"
+
+    if ! command -v jq &>/dev/null; then
+        apt-get install -y jq
+    fi
+
+    if jq -e '.inbounds[] | select(.type == "hysteria2")' "$CONFIG_FILE" >/dev/null 2>&1; then
+        warn "已有 hysteria2 inbound，跳过添加"
+        return
+    fi
+
+    cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
+
+    HY2_INBOUND=$(cat <<EOJ
+{
+  "type": "hysteria2",
+  "tag": "hy2-in",
+  "listen": "::",
+  "listen_port": ${PORT_HY2},
+  "users": [
+    {
+      "password": "${HY2_PASS}"
+    }
+  ],
+  "obfs": {
+    "type": "strange",
+    "password": "${OBFS_PASS}"
+  },
+  "tls": {
+    "enabled": true,
+    "server_name": "${SNI_HY2}",
+    "alpn": ["h3"],
+    "certificate_path": "${CONFIG_DIR}/server.crt",
+    "key_path": "${CONFIG_DIR}/server.key"
+  }
+}
+EOJ
+)
+
+    jq --argjson hy2 "$HY2_INBOUND" '.inbounds += [$hy2]' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+
+    info "验证配置文件..."
+    if ! $BIN_FILE check -c "$CONFIG_FILE"; then
+        err "配置文件验证失败！回滚..."
+        mv "${CONFIG_FILE}.bak" "$CONFIG_FILE" 2>/dev/null || true
+        exit 1
+    fi
+
+    systemctl restart "$SERVICE_NAME"
+    sleep 2
+
+    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+        err "服务重启失败！"
+        journalctl -u "$SERVICE_NAME" --no-pager -n 20
+        exit 1
+    fi
+
+    SERVER_IP=$(curl -s ipv4.icanhazip.com)
+    HY2_URL="hysteria2://${HY2_PASS}@${SERVER_IP}:${PORT_HY2}?insecure=1&obfs=salamander&obfs-password=${OBFS_PASS}&sni=${SNI_HY2}&alpn=h3#Hysteria2"
+
+    echo ""
+    info "Hysteria2 已添加到现有配置 ✅"
+    info "监听端口: $PORT_HY2 (UDP)"
+    echo "${HY2_URL}"
+    info "⚠  Hysteria2 使用自签名证书，客户端需关证书验证(?insecure=1)"
+
+    rm -f "${CONFIG_FILE}.bak"
 }
 
 # ──────────────────────────────────────────────
@@ -622,6 +826,19 @@ function show_config() {
             echo "TUIC v5:    ${TUIC_URL}"
         fi
     done
+
+    # Hysteria2
+    jq -c '.inbounds[] | select(.type == "hysteria2")' "$CONFIG_FILE" 2>/dev/null | while read -r inbound; do
+        PASS=$(echo "$inbound" | jq -r '.users[0].password // empty')
+        PORT=$(echo "$inbound" | jq -r '.listen_port // empty')
+        OBFS_PASS=$(echo "$inbound" | jq -r '.obfs.password // empty')
+        SNI=$(echo "$inbound" | jq -r '.tls.server_name // "salanghe.com"')
+
+        if [ -n "$PASS" ] && [ -n "$PORT" ]; then
+            HY2_URL="hysteria2://${PASS}@${SERVER_IP}:${PORT}?insecure=1&obfs=salamander&obfs-password=${OBFS_PASS}&sni=${SNI}&alpn=h3#Hysteria2"
+            echo "Hysteria2:  ${HY2_URL}"
+        fi
+    done
 }
 
 # ──────────────────────────────────────────────
@@ -634,11 +851,17 @@ case "$1" in
     install-tuic)
         install_tuic
         ;;
+    install-hy2)
+        install_hy2
+        ;;
     install-all)
         install_all
         ;;
     add-tuic)
         add_tuic
+        ;;
+    add-hy2)
+        add_hy2
         ;;
     uninstall)
         uninstall_singbox
@@ -653,12 +876,14 @@ case "$1" in
         show_config
         ;;
     *)
-        echo "用法: $0 {install|install-tuic|install-all|add-tuic|uninstall|restart|status|config}"
+        echo "用法: $0 {install|install-tuic|install-hy2|install-all|add-tuic|add-hy2|uninstall|restart|status|config}"
         echo ""
         echo "  install       - 安装 sing-box VLESS + Reality"
         echo "  install-tuic  - 安装 sing-box TUIC v5（自签证书）"
-        echo "  install-all   - 安装 sing-box 双协议（vless+reality + tuic v5）"
+        echo "  install-hy2   - 安装 sing-box Hysteria2（自签证书）"
+        echo "  install-all   - 安装 sing-box 三协议（vless+reality + tuic v5 + hysteria2）"
         echo "  add-tuic      - 在已有安装上追加 tuic v5"
+        echo "  add-hy2       - 在已有安装上追加 hysteria2"
         echo "  uninstall     - 卸载 sing-box"
         echo "  restart       - 重启服务"
         echo "  status        - 查看服务状态"
