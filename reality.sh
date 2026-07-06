@@ -304,7 +304,7 @@ function install_tuic() {
         }
       ],
       "congestion_control": "bbr",
-      "udp_relay_mode": "native",
+      "v5": true,
       "zero_rtt_handshake": false,
       "tls": {
         "enabled": true,
@@ -336,7 +336,7 @@ EOF
     setup_systemd
 
     SERVER_IP=$(curl -s ipv4.icanhazip.com)
-    TUIC_URL="tuic://${UUID}:${TUIC_PASS}@${SERVER_IP}:${PORT}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=${SNI}#TUIC"
+    TUIC_URL="tuic://${UUID}:${TUIC_PASS}@${SERVER_IP}:${PORT}?congestion_control=bbr&alpn=h3&sni=${SNI}#TUIC"
 
     echo ""
     info "======================"
@@ -500,7 +500,7 @@ function install_all() {
         }
       ],
       "congestion_control": "bbr",
-      "udp_relay_mode": "native",
+      "v5": true,
       "zero_rtt_handshake": false,
       "tls": {
         "enabled": true,
@@ -555,7 +555,7 @@ EOF
 
     SERVER_IP=$(curl -s ipv4.icanhazip.com)
     VLESS_URL="vless://${UUID_VLESS}@${SERVER_IP}:${PORT_VLESS}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI_REALITY}&fp=ios&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp#Reality"
-    TUIC_URL="tuic://${UUID_TUIC}:${TUIC_PASS}@${SERVER_IP}:${PORT_TUIC}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=${SNI_TUIC}#TUIC"
+    TUIC_URL="tuic://${UUID_TUIC}:${TUIC_PASS}@${SERVER_IP}:${PORT_TUIC}?congestion_control=bbr&alpn=h3&sni=${SNI_TUIC}#TUIC"
     HY2_URL="hysteria2://${HY2_PASS}@${SERVER_IP}:${PORT_HY2}?insecure=1&obfs=salamander&obfs-password=${OBFS_PASS}&sni=${SNI_HY2}&alpn=h3#Hysteria2"
 
     echo ""
@@ -698,7 +698,7 @@ function add_tuic() {
     }
   ],
   "congestion_control": "bbr",
-  "udp_relay_mode": "native",
+  "v5": true,
   "zero_rtt_handshake": false,
   "tls": {
     "enabled": true,
@@ -727,7 +727,7 @@ EOJ
     echo ""
     info "TUIC v5 已添加到现有配置 ✅"
     info "端口: $PORT (UDP)"
-    echo "tuic://${UUID}:${TUIC_PASS}@${SERVER_IP}:${PORT}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=${SNI}#TUIC"
+    echo "tuic://${UUID}:${TUIC_PASS}@${SERVER_IP}:${PORT}?congestion_control=bbr&alpn=h3&sni=${SNI}#TUIC"
     info "⚠  tuic v5 使用自签名证书，客户端需关闭证书验证"
     rm -f "${CONFIG_FILE}.bak"
 }
@@ -908,7 +908,7 @@ function show_config() {
         PORT=$(echo "$inbound" | jq -r '.listen_port // empty')
         SNI=$(echo "$inbound" | jq -r '.tls.server_name // "salanghe.com"')
         if [ -n "$UUID" ] && [ -n "$PASS" ] && [ -n "$PORT" ]; then
-            echo "TUIC v5:    tuic://${UUID}:${PASS}@${SERVER_IP}:${PORT}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=${SNI}#TUIC"
+            echo "TUIC v5:    tuic://${UUID}:${PASS}@${SERVER_IP}:${PORT}?congestion_control=bbr&alpn=h3&sni=${SNI}#TUIC"
         fi
     done
 
