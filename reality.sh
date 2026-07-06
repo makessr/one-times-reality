@@ -381,7 +381,7 @@ function install_hy2() {
         }
       ],
       "obfs": {
-        "type": "strange",
+        "type": "salamander",
         "password": "${OBFS_PASS}"
       },
       "tls": {
@@ -519,7 +519,7 @@ function install_all() {
         }
       ],
       "obfs": {
-        "type": "strange",
+        "type": "salamander",
         "password": "${OBFS_PASS}"
       },
       "tls": {
@@ -767,7 +767,7 @@ function add_hy2() {
     }
   ],
   "obfs": {
-    "type": "strange",
+    "type": "salamander",
     "password": "${OBFS_PASS}"
   },
   "tls": {
