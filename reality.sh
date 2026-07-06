@@ -304,7 +304,6 @@ function install_tuic() {
         }
       ],
       "congestion_control": "bbr",
-      "v5": true,
       "zero_rtt_handshake": false,
       "tls": {
         "enabled": true,
@@ -500,7 +499,6 @@ function install_all() {
         }
       ],
       "congestion_control": "bbr",
-      "v5": true,
       "zero_rtt_handshake": false,
       "tls": {
         "enabled": true,
@@ -698,7 +696,6 @@ function add_tuic() {
     }
   ],
   "congestion_control": "bbr",
-  "v5": true,
   "zero_rtt_handshake": false,
   "tls": {
     "enabled": true,
