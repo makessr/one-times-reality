@@ -193,6 +193,7 @@ function install_singbox() {
     KEYPAIR=$($BIN_FILE generate reality-keypair)
     PRIVATE_KEY=$(echo "$KEYPAIR" | grep "PrivateKey" | awk '{print $2}')
     PUBLIC_KEY=$(echo "$KEYPAIR" | grep "PublicKey" | awk '{print $2}')
+    echo "$PUBLIC_KEY" > "${CONFIG_DIR}/vless.pub"
     PORT=$((RANDOM % 10000 + 10000))
     SNI="gateway.icloud.com"
     SHORT_ID=$(openssl rand -hex 4)
@@ -439,6 +440,7 @@ function install_all() {
     KEYPAIR=$($BIN_FILE generate reality-keypair)
     PRIVATE_KEY=$(echo "$KEYPAIR" | grep "PrivateKey" | awk '{print $2}')
     PUBLIC_KEY=$(echo "$KEYPAIR" | grep "PublicKey" | awk '{print $2}')
+    echo "$PUBLIC_KEY" > "${CONFIG_DIR}/vless.pub"
     PORT_VLESS=$((RANDOM % 10000 + 10000))
     SNI_REALITY="gateway.icloud.com"
     SHORT_ID=$(openssl rand -hex 4)
@@ -650,6 +652,7 @@ EOJ
 
     SERVER_IP=$(curl -s ipv4.icanhazip.com)
     PUBLIC_KEY=$($BIN_FILE generate reality-keypair --private-key "$PRIVATE_KEY" 2>/dev/null | grep "PublicKey" | awk '{print $2}')
+    echo "$PUBLIC_KEY" > "${CONFIG_DIR}/vless.pub"
     echo ""
     info "VLESS+Reality 已添加到现有配置 ✅"
     info "端口: $PORT"
@@ -889,11 +892,15 @@ function show_config() {
         UUID=$(echo "$inbound" | jq -r '.users[0].uuid // empty')
         PORT=$(echo "$inbound" | jq -r '.listen_port // empty')
         SHORT_ID=$(echo "$inbound" | jq -r '.tls.reality.short_id[0] // empty')
-        PRIVATE_KEY=$(echo "$inbound" | jq -r '.tls.reality.private_key // empty')
         SNI=$(echo "$inbound" | jq -r '.tls.server_name // "gateway.icloud.com"')
-        if [ -n "$PRIVATE_KEY" ] && [ -f "$BIN_FILE" ]; then
-            PUBLIC_KEY=$($BIN_FILE generate reality-keypair --private-key "$PRIVATE_KEY" 2>/dev/null | grep "PublicKey" | awk '{print $2}')
-            if [ -n "$UUID" ] && [ -n "$PORT" ] && [ -n "$PUBLIC_KEY" ] && [ -n "$SHORT_ID" ]; then
+        if [ -n "$UUID" ] && [ -n "$PORT" ] && [ -n "$SHORT_ID" ]; then
+            PUBLIC_KEY=""
+            [ -f "${CONFIG_DIR}/vless.pub" ] && PUBLIC_KEY=$(cat "${CONFIG_DIR}/vless.pub")
+            if [ -z "$PUBLIC_KEY" ] && [ -f "$BIN_FILE" ]; then
+                PRIVATE_KEY=$(echo "$inbound" | jq -r '.tls.reality.private_key // empty')
+                [ -n "$PRIVATE_KEY" ] && PUBLIC_KEY=$($BIN_FILE generate reality-keypair --private-key "$PRIVATE_KEY" 2>/dev/null | grep "PublicKey" | awk '{print $2}')
+            fi
+            if [ -n "$PUBLIC_KEY" ]; then
                 echo "VLESS Reality: vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI}&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp#Reality"
             fi
         fi
