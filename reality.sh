@@ -193,12 +193,12 @@ function install_singbox() {
     KEYPAIR=$($BIN_FILE generate reality-keypair)
     PRIVATE_KEY=$(echo "$KEYPAIR" | grep "PrivateKey" | awk '{print $2}')
     PUBLIC_KEY=$(echo "$KEYPAIR" | grep "PublicKey" | awk '{print $2}')
-    echo "$PUBLIC_KEY" > "${CONFIG_DIR}/vless.pub"
     PORT=$((RANDOM % 10000 + 10000))
     SNI="gateway.icloud.com"
     SHORT_ID=$(openssl rand -hex 4)
 
     mkdir -p "$CONFIG_DIR"
+    echo "$PUBLIC_KEY" > "${CONFIG_DIR}/vless.pub"
 
     cat > "$CONFIG_FILE" <<EOF
 {
@@ -440,7 +440,6 @@ function install_all() {
     KEYPAIR=$($BIN_FILE generate reality-keypair)
     PRIVATE_KEY=$(echo "$KEYPAIR" | grep "PrivateKey" | awk '{print $2}')
     PUBLIC_KEY=$(echo "$KEYPAIR" | grep "PublicKey" | awk '{print $2}')
-    echo "$PUBLIC_KEY" > "${CONFIG_DIR}/vless.pub"
     PORT_VLESS=$((RANDOM % 10000 + 10000))
     SNI_REALITY="gateway.icloud.com"
     SHORT_ID=$(openssl rand -hex 4)
@@ -456,6 +455,7 @@ function install_all() {
     SNI_HY2="salanghe.com"
 
     mkdir -p "$CONFIG_DIR"
+    echo "$PUBLIC_KEY" > "${CONFIG_DIR}/vless.pub"
     gen_self_signed_cert "$CONFIG_DIR"
 
     cat > "$CONFIG_FILE" <<EOF
