@@ -63,7 +63,7 @@ function gen_self_signed_cert() {
         info "生成自签名证书..."
         openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
             -days 3650 -keyout "$CERT_DIR/server.key" -out "$CERT_DIR/server.crt" \
-            -subj "/CN=salanghe.com" -addext "subjectAltName=DNS:salanghe.com"
+            -subj "/CN=bing.com" -addext "subjectAltName=DNS:bing.com"
         info "证书已生成: $CERT_DIR/server.crt"
     else
         info "证书已存在，跳过生成"
@@ -282,7 +282,7 @@ function install_tuic() {
     UUID=$(cat /proc/sys/kernel/random/uuid)
     TUIC_PASS=$(openssl rand -base64 16 | tr -d '=+/')
     PORT=$((RANDOM % 10000 + 20000))
-    SNI="salanghe.com"
+    SNI="bing.com"
 
     mkdir -p "$CONFIG_DIR"
     gen_self_signed_cert "$CONFIG_DIR"
@@ -360,7 +360,7 @@ function install_hy2() {
     HY2_PASS=$(openssl rand -base64 16 | tr -d '=+/')
     OBFS_PASS=$(openssl rand -base64 12 | tr -d '=+/')
     PORT=$((RANDOM % 10000 + 30000))
-    SNI="salanghe.com"
+    SNI="bing.com"
 
     mkdir -p "$CONFIG_DIR"
     gen_self_signed_cert "$CONFIG_DIR"
@@ -447,12 +447,12 @@ function install_all() {
     UUID_TUIC=$(cat /proc/sys/kernel/random/uuid)
     TUIC_PASS=$(openssl rand -base64 16 | tr -d '=+/')
     PORT_TUIC=$((RANDOM % 10000 + 20000))
-    SNI_TUIC="salanghe.com"
+    SNI_TUIC="bing.com"
 
     HY2_PASS=$(openssl rand -base64 16 | tr -d '=+/')
     OBFS_PASS=$(openssl rand -base64 12 | tr -d '=+/')
     PORT_HY2=$((RANDOM % 10000 + 30000))
-    SNI_HY2="salanghe.com"
+    SNI_HY2="bing.com"
 
     mkdir -p "$CONFIG_DIR"
     echo "$PUBLIC_KEY" > "${CONFIG_DIR}/vless.pub"
@@ -681,7 +681,7 @@ function add_tuic() {
     UUID=$(cat /proc/sys/kernel/random/uuid)
     TUIC_PASS=$(openssl rand -base64 16 | tr -d '=+/')
     PORT=$((RANDOM % 10000 + 20000))
-    SNI="salanghe.com"
+    SNI="bing.com"
 
     gen_self_signed_cert "$CONFIG_DIR"
     cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
@@ -753,7 +753,7 @@ function add_hy2() {
     HY2_PASS=$(openssl rand -base64 16 | tr -d '=+/')
     OBFS_PASS=$(openssl rand -base64 12 | tr -d '=+/')
     PORT=$((RANDOM % 10000 + 30000))
-    SNI="salanghe.com"
+    SNI="bing.com"
 
     gen_self_signed_cert "$CONFIG_DIR"
     cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
@@ -910,7 +910,7 @@ function show_config() {
         UUID=$(echo "$inbound" | jq -r '.users[0].uuid // empty')
         PASS=$(echo "$inbound" | jq -r '.users[0].password // empty')
         PORT=$(echo "$inbound" | jq -r '.listen_port // empty')
-        SNI=$(echo "$inbound" | jq -r '.tls.server_name // "salanghe.com"')
+        SNI=$(echo "$inbound" | jq -r '.tls.server_name // "bing.com"')
         if [ -n "$UUID" ] && [ -n "$PASS" ] && [ -n "$PORT" ]; then
             echo "TUIC v5:    tuic://${UUID}:${PASS}@${SERVER_IP}:${PORT}?congestion_control=bbr&alpn=h3&sni=${SNI}#TUIC"
         fi
@@ -920,7 +920,7 @@ function show_config() {
         PASS=$(echo "$inbound" | jq -r '.users[0].password // empty')
         PORT=$(echo "$inbound" | jq -r '.listen_port // empty')
         OBFS_PASS=$(echo "$inbound" | jq -r '.obfs.password // empty')
-        SNI=$(echo "$inbound" | jq -r '.tls.server_name // "salanghe.com"')
+        SNI=$(echo "$inbound" | jq -r '.tls.server_name // "bing.com"')
         if [ -n "$PASS" ] && [ -n "$PORT" ]; then
             echo "Hysteria2:  hysteria2://${PASS}@${SERVER_IP}:${PORT}?insecure=1&obfs=salamander&obfs-password=${OBFS_PASS}&sni=${SNI}&alpn=h3#Hysteria2"
         fi
